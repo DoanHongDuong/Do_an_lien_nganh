@@ -1,7 +1,7 @@
 #  Hệ thống quản lý cửa hàng và phân tích doanh thu
 
 ##  Giới thiệu
-Dự án **Hệ thống quản lý cửa hàng và phân tích doanh thu** là một đồ án liên ngành nhằm xây dựng một ứng dụng web hỗ trợ quản lý hoạt động kinh doanh cho các cửa hàng nhỏ và vừa. Hệ thống giúp quản lý sản phẩm, đơn hàng, nhân viên và theo dõi doanh thu thông qua các báo cáo, biểu đồ trực quan, từ đó hỗ trợ người quản lý đưa ra quyết định hiệu quả hơn.
+Dự án **Hệ thống quản lý cửa hàng và phân tích doanh thu** là một đồ án liên ngành nhằm xây dựng một ứng dụng web hỗ trợ quản lý hoạt động kinh doanh cho các cửa hàng nhỏ và vừa. Hệ thống giúp quản lý sản phẩm, đơn hàng và theo dõi doanh thu thông qua các báo cáo, biểu đồ trực quan, từ đó hỗ trợ người quản lý đưa ra quyết định hiệu quả hơn.
 
 ##  Mục tiêu
 - Xây dựng hệ thống quản lý cửa hàng cơ bản trên nền tảng web  
@@ -11,7 +11,6 @@ Dự án **Hệ thống quản lý cửa hàng và phân tích doanh thu** là m
 ##  Chức năng chính
 - Quản lý sản phẩm (thêm, sửa, xóa, cập nhật)
 - Quản lý đơn hàng
-- Quản lý nhân viên
 - Thống kê và phân tích doanh thu theo ngày, tháng, năm
 - Dashboard hiển thị biểu đồ doanh thu
 
