@@ -4,7 +4,7 @@
   "description": "Dự án **Hệ thống quản lý cửa hàng và phân tích doanh thu** là một đồ án liên ngành nhằm xây dựng một ứng dụng web hỗ trợ quản lý hoạt động kinh doanh cho các cửa hàng nhỏ và vừa. Hệ thống giúp quản lý sản phẩm, đơn hàng và theo dõi doanh thu thông qua các báo cáo, biểu đồ trực quan, từ đó hỗ trợ người quản lý đưa ra quyết định hiệu quả hơn.",
   "main": "index.js",
   "scripts": {
-    "start": "concurrently \"cd backend && node server.js\" \"cd frontend && npm run dev\""
+    "start": "concurrently \"npm start --prefix backend\" \"npm run dev --prefix frontend\""
   },
   "keywords": [],
   "author": "",

@@ -9,7 +9,7 @@ const PORT = 5000;
 app.use(cors()); // Cho phép frontend gọi
 app.use(express.json()); // Để đọc dữ liệu JSON gửi lên
 
-// 1. API Lấy danh sách sản phẩm
+// --- 1. API Lấy danh sách sản phẩm ---
 app.get('/api/products', async (req, res) => {
     try {
         const [rows] = await db.query('SELECT * FROM products');
@@ -19,7 +19,24 @@ app.get('/api/products', async (req, res) => {
     }
 });
 
-// 2. API Báo cáo doanh thu (Dùng câu SQL bạn đã viết)
+// --- 2. API Thêm sản phẩm mới (QUAN TRỌNG: Đã thêm phần nhận image_url) ---
+app.post('/api/products', async (req, res) => {
+    try {
+        // Lấy dữ liệu từ Frontend gửi xuống
+        const { product_name, category_id, price, stock, image_url } = req.body;
+        
+        const sql = 'INSERT INTO products (product_name, category_id, price, stock, image_url) VALUES (?, ?, ?, ?, ?)';
+        
+        // Thực hiện thêm vào DB
+        await db.query(sql, [product_name, category_id, price, stock, image_url]);
+        
+        res.json({ message: 'Thêm sản phẩm thành công!' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// --- 3. API Báo cáo doanh thu ---
 app.get('/api/reports/revenue', async (req, res) => {
     try {
         const sql = `
@@ -35,7 +52,7 @@ app.get('/api/reports/revenue', async (req, res) => {
     }
 });
 
-// 3. API Top sản phẩm bán chạy (Dùng câu SQL bạn đã viết)
+// --- 4. API Top sản phẩm bán chạy ---
 app.get('/api/reports/top-products', async (req, res) => {
     try {
         const sql = `
@@ -52,6 +69,7 @@ app.get('/api/reports/top-products', async (req, res) => {
     }
 });
 
+// Chạy server
 app.listen(PORT, () => {
     console.log(`Server đang chạy tại http://localhost:${PORT}`);
 });
