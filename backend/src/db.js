@@ -2,10 +2,11 @@ const mysql = require('mysql2');
 require('dotenv').config(); // Nếu bạn có dùng file .env
 
 const pool = mysql.createPool({
-    host: 'localhost',
-    user: 'root',      // Thay user của bạn
-    password: 'hd15052k4',   // Thay pass của bạn
-    database: 'do_an_lien_nganh',
+    host: process.env.DB_HOST || 'localhost',
+    user: process.env.DB_USER || 'root',      // Thay user của bạn
+    password: process.env.DB_PASSWORD || '',  // Thay pass của bạn
+    database: process.env.DB_NAME || 'do_an_lien_nganh',
+    port: process.env.DB_PORT || 3306,
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0
