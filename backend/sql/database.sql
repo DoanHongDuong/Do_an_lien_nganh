@@ -1,4 +1,4 @@
--- 1. LÀM SẠCH VÀ KHỞI TẠO (Giúp chạy lại nhiều lần không lỗi)
+
 DROP DATABASE IF EXISTS do_an_lien_nganh;
 CREATE DATABASE do_an_lien_nganh
 CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -79,10 +79,30 @@ END$$
 
 DELIMITER ;
 
--- 4. DỮ LIỆU MẪU
-INSERT INTO categories (category_name) VALUES ('Vợt cầu lông'), ('Giày cầu lông'), ('Phụ kiện');
+
+-- Thêm tài khoản admin mặc định (Mật khẩu đang để tạm là 123456)
+INSERT INTO users (username, password, role) VALUES ('admin', '123456', 'admin');
+
+
+INSERT INTO categories (category_name) VALUES 
+('Vợt Cầu Lông'), 
+('Giày Thể Thao'), 
+('Quần Áo'), 
+('Phụ Kiện');
+
 INSERT INTO products (product_name, category_id, price, stock) VALUES
-('Yonex Astrox 99', 1, 4500000, 10), ('Lining Turbo X', 1, 2800000, 15), ('Giày Victor A970', 2, 1900000, 8);
-INSERT INTO customers (customer_name, phone) VALUES ('Nguyễn Văn A', '0901234567'), ('Trần Thị B', '0912345678');
-INSERT INTO orders (customer_id, order_date, total_amount) VALUES (1, '2026-01-10', 0), (2, '2026-01-11', 0);
-INSERT INTO order_items (order_id, product_id, quantity, price) VALUES (1, 1, 1, 4500000), (2, 2, 1, 2800000);
+('Yonex Astrox 99', 1, 4500000, 10), 
+('Lining Turbo X', 1, 2800000, 15), 
+('Giày Victor A970', 2, 1900000, 8);
+
+INSERT INTO customers (customer_name, phone) VALUES 
+('Nguyễn Văn A', '0901234567'), 
+('Trần Thị B', '0912345678');
+
+INSERT INTO orders (customer_id, order_date, total_amount) VALUES 
+(1, '2026-01-10', 0), 
+(2, '2026-01-11', 0);
+
+INSERT INTO order_items (order_id, product_id, quantity, price) VALUES 
+(1, 1, 1, 4500000), 
+(2, 2, 1, 2800000);

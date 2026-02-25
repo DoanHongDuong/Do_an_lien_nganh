@@ -9,7 +9,9 @@ import {
 import { Routes, Route, useNavigate, useLocation } from "react-router-dom";
 
 import Home from "./pages/Home";
+import Orders from "./pages/Orders";
 import Products from "./pages/Products";
+import Customers from "./pages/Customers"; // 1. THÊM DÒNG IMPORT NÀY VÀO ĐÂY
 
 const { Header, Content, Footer, Sider } = Layout;
 const { Title } = Typography;
@@ -91,6 +93,8 @@ export default function App() {
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/products" element={<Products />} />
+              <Route path="/orders" element={<Orders />} />
+              <Route path="/customers" element={<Customers />} />
             </Routes>
           </div>
         </Content>
