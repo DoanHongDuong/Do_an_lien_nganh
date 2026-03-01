@@ -17,7 +17,7 @@ import Products from "./pages/Products";
 import Customers from "./pages/Customers";
 import Orders from "./pages/Orders";
 import Login from "./pages/Login";
-// import Employees from "./pages/Employees"; // Bỏ comment dòng này nếu bạn đã tạo file Employees.jsx
+import Employees from "./pages/Employees";
 
 const { Header, Content, Footer, Sider } = Layout;
 const { Title } = Typography;
@@ -125,7 +125,7 @@ export default function App() {
               <Route path="/orders" element={<Orders />} />
               
               {/* Chỉ Admin mới vào được trang nhân viên */}
-              {/* {user.role === 'admin' && <Route path="/employees" element={<Employees />} />} */}
+              {user.role === 'admin' && <Route path="/employees" element={<Employees />} />}
               
               {/* Route mặc định: Nếu link sai hoặc Staff vào trang chủ -> Đẩy về trang Sản phẩm */}
               <Route path="*" element={<Navigate to="/products" />} />
