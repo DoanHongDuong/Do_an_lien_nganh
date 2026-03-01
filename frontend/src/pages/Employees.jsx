@@ -1,14 +1,32 @@
 import React, { useState, useEffect } from "react";
-import { Table, Button, Modal, Form, Input, InputNumber, message, Popconfirm, Card, Statistic, Row, Col } from "antd";
+import { Table, Button, Modal, Form, Input, InputNumber, message, Popconfirm, Card, Statistic, Row, Col, Space } from "antd";
 import axios from "axios";
-import { UserAddOutlined, DollarCircleOutlined } from "@ant-design/icons";
+import { UserAddOutlined, DollarCircleOutlined, KeyOutlined } from "@ant-design/icons";
 
 const Employees = () => {
+    // --- 1. STATE QUẢN LÝ DỮ LIỆU ---
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(false);
+
+    // State cho Modal Thêm/Sửa nhân viên
     const [open, setOpen] = useState(false);
-    const [editingUser, setEditingUser] = useState(null); // Để biết đang sửa hay thêm mới
+    const [editingUser, setEditingUser] = useState(null);
     const [form] = Form.useForm();
+
+    // State cho Modal Đổi Mật Khẩu (Mới thêm)
+    const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+    const [passwordUser, setPasswordUser] = useState(null); // Lưu user đang được đổi pass
+    const [newPassword, setNewPassword] = useState("");
+
+    // --- 2. HÀM TIỆN ÍCH LẤY HEADER (QUAN TRỌNG) ---
+    // Hàm này giúp lấy role hiện tại để gửi xuống backend
+    const getAuthHeaders = () => {
+        const currentUser = JSON.parse(localStorage.getItem('user'));
+        return {
+            'Content-Type': 'application/json',
+            'x-user-role': currentUser?.role || ''
+        };
+    };
 
     const fetchUsers = async () => {
         setLoading(true);
@@ -25,44 +43,93 @@ const Employees = () => {
         fetchUsers();
     }, []);
 
-    // Tính tổng quỹ lương
     const totalSalary = users.reduce((sum, u) => sum + Number(u.salary), 0);
 
+    // --- 3. XỬ LÝ THÊM / SỬA NHÂN VIÊN ---
     const handleSave = async () => {
         try {
             const values = await form.validateFields();
             if (editingUser) {
-                // Cập nhật
-                await axios.put(`http://localhost:5000/api/users/${editingUser.user_id}`, values);
+                // Cập nhật (Kèm Header xác thực)
+                await axios.put(
+                    `http://localhost:5000/api/users/${editingUser.user_id}`, 
+                    values,
+                    { headers: getAuthHeaders() } // <--- BẮT BUỘC PHẢI CÓ
+                );
                 message.success("Cập nhật thành công!");
             } else {
-                // Thêm mới
-                await axios.post("http://localhost:5000/api/users", values);
+                // Thêm mới (Kèm Header xác thực)
+                await axios.post(
+                    "http://localhost:5000/api/users", 
+                    values,
+                    { headers: getAuthHeaders() } // <--- BẮT BUỘC PHẢI CÓ
+                );
                 message.success("Thêm nhân viên mới thành công!");
             }
             setOpen(false);
             fetchUsers();
         } catch (error) {
-            message.error("Có lỗi xảy ra");
+            // Check lỗi từ backend trả về
+            if (error.response && error.response.status === 403) {
+                message.error("Bạn không có quyền thực hiện (Cần Admin)");
+            } else {
+                message.error("Có lỗi xảy ra");
+            }
         }
     };
 
+    // --- 4. XỬ LÝ XÓA NHÂN VIÊN ---
     const handleDelete = async (id) => {
         try {
-            await axios.delete(`http://localhost:5000/api/users/${id}`);
+            await axios.delete(`http://localhost:5000/api/users/${id}`, {
+                headers: getAuthHeaders() // <--- BẮT BUỘC PHẢI CÓ
+            });
             message.success("Đã xóa nhân viên");
             fetchUsers();
         } catch (error) {
-            message.error("Lỗi khi xóa");
+            if (error.response && error.response.status === 403) {
+                message.error("Bạn không được phép xóa nhân viên!");
+            } else {
+                message.error("Lỗi khi xóa");
+            }
+        }
+    };
+
+    // --- 5. XỬ LÝ ĐỔI MẬT KHẨU (LOGIC MỚI) ---
+    const openPasswordModal = (user) => {
+        setPasswordUser(user);
+        setNewPassword("");
+        setPasswordModalOpen(true);
+    };
+
+    const handleChangePassword = async () => {
+        if (!newPassword) return message.warning("Vui lòng nhập mật khẩu mới");
+
+        try {
+            // Gọi API đổi mật khẩu (Kèm Header)
+            await axios.put(
+                `http://localhost:5000/api/users/${passwordUser.user_id}/change-password`,
+                { new_password: newPassword },
+                { headers: getAuthHeaders() } // <--- QUAN TRỌNG
+            );
+            
+            message.success(`Đã đổi pass cho ${passwordUser.username}`);
+            setPasswordModalOpen(false);
+        } catch (error) {
+            if (error.response && error.response.status === 403) {
+                message.error("Bạn không có quyền đổi mật khẩu!");
+            } else {
+                message.error("Lỗi kết nối server");
+            }
         }
     };
 
     const openModal = (user = null) => {
         setEditingUser(user);
         if (user) {
-            form.setFieldsValue(user); // Điền dữ liệu cũ vào form nếu là sửa
+            form.setFieldsValue(user);
         } else {
-            form.resetFields(); // Xóa trắng form nếu là thêm mới
+            form.resetFields();
         }
         setOpen(true);
     };
@@ -70,7 +137,7 @@ const Employees = () => {
     const columns = [
         { title: "ID", dataIndex: "user_id", width: 60 },
         { title: "Họ và tên", dataIndex: "full_name", render: (t) => <strong>{t}</strong> },
-        { title: "Tài khoản (Username)", dataIndex: "username" },
+        { title: "Tài khoản", dataIndex: "username" },
         { 
             title: "Lương cơ bản", 
             dataIndex: "salary", 
@@ -79,18 +146,30 @@ const Employees = () => {
         {
             title: "Hành động",
             render: (_, r) => (
-                <>
-                    <Button type="link" onClick={() => openModal(r)}>Sửa lương</Button>
+                <Space>
+                    <Button type="link" onClick={() => openModal(r)}>Sửa</Button>
+                    
+                    {/* NÚT ĐỔI MẬT KHẨU MỚI THÊM */}
+                    <Button 
+                        type="dashed" 
+                        size="small" 
+                        icon={<KeyOutlined />} 
+                        onClick={() => openPasswordModal(r)}
+                    >
+                        Đổi MK
+                    </Button>
+
                     <Popconfirm title="Sa thải nhân viên này?" onConfirm={() => handleDelete(r.user_id)}>
                         <Button type="link" danger>Xóa</Button>
                     </Popconfirm>
-                </>
+                </Space>
             ),
         },
     ];
 
     return (
         <div>
+            {/* THỐNG KÊ */}
             <Row gutter={16} style={{ marginBottom: 20 }}>
                 <Col span={8}>
                     <Card>
@@ -106,6 +185,7 @@ const Employees = () => {
                 </Col>
             </Row>
 
+            {/* THANH CÔNG CỤ */}
             <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between' }}>
                 <h3>Danh sách nhân viên</h3>
                 <Button type="primary" icon={<UserAddOutlined />} onClick={() => openModal(null)}>
@@ -113,8 +193,10 @@ const Employees = () => {
                 </Button>
             </div>
 
+            {/* BẢNG DỮ LIỆU */}
             <Table rowKey="user_id" columns={columns} dataSource={users} loading={loading} />
 
+            {/* MODAL 1: THÊM / SỬA NHÂN VIÊN */}
             <Modal
                 title={editingUser ? "Cập nhật nhân viên" : "Tuyển nhân viên mới"}
                 open={open}
@@ -126,7 +208,6 @@ const Employees = () => {
                         <Input placeholder="Ví dụ: Nguyễn Văn A" />
                     </Form.Item>
                     
-                    {/* Chỉ cho nhập username/password khi thêm mới, sửa thì khóa lại */}
                     {!editingUser && (
                         <>
                             <Form.Item name="username" label="Tên đăng nhập" rules={[{ required: true }]}>
@@ -142,6 +223,24 @@ const Employees = () => {
                         <InputNumber style={{ width: '100%' }} formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} parser={value => value.replace(/\$\s?|(,*)/g, '')} />
                     </Form.Item>
                 </Form>
+            </Modal>
+
+            {/* MODAL 2: ĐỔI MẬT KHẨU (MỚI) */}
+            <Modal
+                title={`Đổi mật khẩu cho: ${passwordUser?.full_name}`}
+                open={passwordModalOpen}
+                onOk={handleChangePassword}
+                onCancel={() => setPasswordModalOpen(false)}
+                okText="Lưu mật khẩu mới"
+                cancelText="Hủy"
+            >
+                <p>Nhập mật khẩu mới cho nhân viên <strong>{passwordUser?.username}</strong>:</p>
+                <Input.Password 
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Nhập mật khẩu mới..."
+                    prefix={<KeyOutlined />}
+                />
             </Modal>
         </div>
     );

@@ -7,27 +7,46 @@ const PORT = 5000;
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+
 app.use(cors());
 app.use(express.json());
+
+// ==========================================
+// [MỚI] 0. MIDDLEWARE CHECK QUYỀN ADMIN
+// ==========================================
+const checkAdmin = (req, res, next) => {
+    // Lấy role từ Header do Frontend gửi lên
+    const userRole = req.headers['x-user-role']; 
+
+    if (userRole === 'admin') {
+        next(); // Là Admin -> Cho phép đi tiếp
+    } else {
+        res.status(403).json({ 
+            success: false, 
+            message: "Truy cập bị từ chối: Bạn không có quyền Admin!" 
+        });
+    }
+};
+
 const uploadDir = 'uploads';
 if (!fs.existsSync(uploadDir)){
     fs.mkdirSync(uploadDir);
-    console.log('Đã tạo thư mục uploads');
+    console.log('📁 Đã tạo thư mục uploads');
 }
+
 // 1. CẤU HÌNH UPLOAD ẢNH (MULTER)
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        cb(null, 'uploads/'); // Lưu vào thư mục uploads
+        cb(null, 'uploads/'); 
     },
     filename: function (req, file, cb) {
-        // Đặt tên file = thời gian + đuôi file gốc
         const uniqueSuffix = Date.now() + path.extname(file.originalname);
         cb(null, uniqueSuffix);
     }
 });
 const upload = multer({ storage: storage });
 
-// 2. MỞ CÔNG KHAI FOLDER UPLOADS (Chỉ cần khai báo 1 lần)
+// 2. MỞ CÔNG KHAI FOLDER UPLOADS
 app.use('/uploads', express.static('uploads'));
 
 // 3. ĐĂNG KÝ ROUTE PHỤ
@@ -55,6 +74,7 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
+// Ai cũng xem được danh sách (Hoặc thích thì thêm checkAdmin vào đây cũng được)
 app.get('/api/users', async (req, res) => {
     try {
         const [rows] = await db.query("SELECT user_id, full_name, username, role, salary FROM users WHERE role != 'admin'");
@@ -64,7 +84,8 @@ app.get('/api/users', async (req, res) => {
     }
 });
 
-app.post('/api/users', async (req, res) => {
+// [MỚI] Thêm nhân viên -> Phải là Admin
+app.post('/api/users', checkAdmin, async (req, res) => {
     const { full_name, username, password, salary } = req.body;
     try {
         await db.query(
@@ -77,7 +98,8 @@ app.post('/api/users', async (req, res) => {
     }
 });
 
-app.put('/api/users/:id', async (req, res) => {
+// [MỚI] Sửa nhân viên -> Phải là Admin
+app.put('/api/users/:id', checkAdmin, async (req, res) => {
     const { full_name, salary } = req.body;
     try {
         await db.query(
@@ -90,7 +112,8 @@ app.put('/api/users/:id', async (req, res) => {
     }
 });
 
-app.delete('/api/users/:id', async (req, res) => {
+// [MỚI] Xóa nhân viên -> Phải là Admin
+app.delete('/api/users/:id', checkAdmin, async (req, res) => {
     try {
         await db.query("DELETE FROM users WHERE user_id = ?", [req.params.id]);
         res.json({ message: 'Đã xóa nhân viên' });
@@ -99,9 +122,22 @@ app.delete('/api/users/:id', async (req, res) => {
     }
 });
 
+// [MỚI] API QUAN TRỌNG: Admin đổi mật khẩu nhân viên
+app.put('/api/users/:id/change-password', checkAdmin, async (req, res) => {
+    const { id } = req.params;
+    const { new_password } = req.body;
+    
+    try {
+        await db.query("UPDATE users SET password = ? WHERE user_id = ?", [new_password, id]);
+        res.json({ success: true, message: "Đã đổi mật khẩu nhân viên thành công!" });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 
 // ==========================================
-// API 2: QUẢN LÝ KHÁCH HÀNG
+// API 2: QUẢN LÝ KHÁCH HÀNG (Giữ nguyên)
 // ==========================================
 app.get('/api/customers', async (req, res) => {
     try {
@@ -136,10 +172,8 @@ app.delete('/api/customers/:id', async (req, res) => {
 
 
 // ==========================================
-// API 3: QUẢN LÝ SẢN PHẨM (ĐÃ SỬA CHUẨN)
+// API 3: QUẢN LÝ SẢN PHẨM (Giữ nguyên)
 // ==========================================
-
-// Lấy danh sách sản phẩm
 app.get('/api/products', async (req, res) => {
     try {
         const [rows] = await db.query('SELECT * FROM products');
@@ -147,7 +181,6 @@ app.get('/api/products', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Lấy danh sách danh mục
 app.get('/api/categories', async (req, res) => {
     try {
         const [rows] = await db.query('SELECT * FROM categories');
@@ -155,39 +188,29 @@ app.get('/api/categories', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// THÊM SẢN PHẨM (CÓ ẢNH)
-// Lưu ý: Đã xóa đoạn code thừa, chỉ giữ lại đoạn có upload.single
 app.post('/api/products', upload.single('image'), async (req, res) => {
     const { product_name, category_id, price, stock } = req.body;
     let image_url = "";
-
     try {
         if (req.file) {
-            // Nếu có file ảnh, tạo đường dẫn đầy đủ
             image_url = `http://localhost:${PORT}/uploads/${req.file.filename}`;
         } else {
-            // Nếu không up ảnh, dùng ảnh mặc định
             image_url = "https://via.placeholder.com/150";
         }
-
         await db.query(
             `INSERT INTO products (product_name, category_id, price, stock, image_url) VALUES (?, ?, ?, ?, ?)`,
             [product_name, category_id, price, stock, image_url]
         );
         res.json({ message: 'Thêm sản phẩm thành công' });
     } catch (e) {
-        console.error(e);
         res.status(500).json({ error: e.message });
     }
 });
 
-// SỬA SẢN PHẨM (CÓ THỂ UPDATE ẢNH HOẶC KHÔNG)
 app.put('/api/products/:id', upload.single('image'), async (req, res) => {
     const { id } = req.params;
     const { product_name, category_id, price, stock } = req.body;
-    
     try {
-        // Nếu người dùng chọn file mới
         if (req.file) {
             const image_url = `http://localhost:${PORT}/uploads/${req.file.filename}`;
             await db.query(
@@ -195,7 +218,6 @@ app.put('/api/products/:id', upload.single('image'), async (req, res) => {
                 [product_name, category_id, price, stock, image_url, id]
             );
         } else {
-            // Nếu không chọn file mới (giữ ảnh cũ)
             await db.query(
                 `UPDATE products SET product_name=?, category_id=?, price=?, stock=? WHERE product_id=?`,
                 [product_name, category_id, price, stock, id]
@@ -203,12 +225,10 @@ app.put('/api/products/:id', upload.single('image'), async (req, res) => {
         }
         res.json({ message: 'Cập nhật thành công' });
     } catch (e) { 
-        console.error(e);
         res.status(500).json({ error: e.message }); 
     }
 });
 
-// Xóa sản phẩm
 app.delete('/api/products/:id', async (req, res) => {
     try {
         await db.query('DELETE FROM products WHERE product_id=?', [req.params.id]);
@@ -218,7 +238,7 @@ app.delete('/api/products/:id', async (req, res) => {
 
 
 // ==========================================
-// API 4: QUẢN LÝ ĐƠN HÀNG
+// API 4: QUẢN LÝ ĐƠN HÀNG (Giữ nguyên)
 // ==========================================
 app.get('/api/orders', async (req, res) => {
     try {
@@ -272,6 +292,8 @@ app.post('/api/orders', async (req, res) => {
 // ==========================================
 // API 5: DASHBOARD & KHÁC
 // ==========================================
+
+// Đây là API tự đổi mật khẩu của bản thân (Ai đổi cũng được nếu biết pass cũ -> Không cần checkAdmin)
 app.put('/api/change-password', async (req, res) => {
     const { username, old_password, new_password } = req.body;
     try {
