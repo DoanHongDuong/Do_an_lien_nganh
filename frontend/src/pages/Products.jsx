@@ -9,22 +9,27 @@ import {
     Space,
     Popconfirm,
     message,
-    Select // 1. Import thêm Select từ antd
+    Select,
+    Image // Thêm Image để hiển thị ảnh trong bảng
 } from "antd";
 import { useEffect, useState } from "react";
 import axios from "axios";
+import { UploadOutlined } from '@ant-design/icons'; // Import icon upload
 
 const { Title } = Typography;
 const API_PRODUCTS = "http://localhost:5000/api/products";
-const API_CATEGORIES = "http://localhost:5000/api/categories"; // 2. Đường dẫn API lấy danh mục
+const API_CATEGORIES = "http://localhost:5000/api/categories";
 
 const Products = () => {
     const [data, setData] = useState([]);
-    const [categories, setCategories] = useState([]); // State lưu danh sách danh mục
+    const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(false);
     const [open, setOpen] = useState(false);
     const [editing, setEditing] = useState(null);
     const [form] = Form.useForm();
+    
+    // State lưu file ảnh được chọn
+    const [file, setFile] = useState(null);
 
     // Lấy danh sách sản phẩm
     const fetchProducts = async () => {
@@ -49,20 +54,28 @@ const Products = () => {
         }
     };
 
-    // Gọi API khi vừa mở trang
     useEffect(() => {
         fetchProducts();
-        fetchCategories(); 
+        fetchCategories();
     }, []);
+
+    // Hàm xử lý khi người dùng chọn file từ máy tính
+    const handleFileChange = (e) => {
+        if (e.target.files && e.target.files[0]) {
+            setFile(e.target.files[0]); // Lưu file vào state
+        }
+    };
 
     const openAdd = () => {
         setEditing(null);
+        setFile(null); // Reset file cũ
         form.resetFields();
         setOpen(true);
     };
 
     const openEdit = (record) => {
         setEditing(record);
+        setFile(null); // Reset file cũ
         form.setFieldsValue(record);
         setOpen(true);
     };
@@ -77,38 +90,74 @@ const Products = () => {
         }
     };
 
+    // --- PHẦN QUAN TRỌNG NHẤT: XỬ LÝ GỬI FORM DATA ---
     const handleSubmit = async () => {
         try {
-            // Validate dữ liệu form trước
             const values = await form.validateFields();
+            
+            // 1. Tạo đối tượng FormData
+            const formData = new FormData();
 
+            // 2. Đưa các dữ liệu chữ vào FormData
+            formData.append('product_name', values.product_name);
+            formData.append('price', values.price);
+            formData.append('stock', values.stock);
+            formData.append('category_id', values.category_id);
+
+            // 3. Nếu có chọn file mới thì đưa vào, không thì thôi
+            if (file) {
+                formData.append('image', file);
+            }
+
+            // 4. Gửi request
             if (editing) {
-                await axios.put(`${API_PRODUCTS}/${editing.product_id}`, values);
+                // Lưu ý: Nếu backend chưa hỗ trợ PUT với FormData, bạn cần sửa backend thêm.
+                // Tạm thời code này giả định backend API PUT cũng dùng multer giống POST
+                await axios.put(`${API_PRODUCTS}/${editing.product_id}`, formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                });
                 message.success("Cập nhật thành công");
             } else {
-                await axios.post(API_PRODUCTS, values);
+                await axios.post(API_PRODUCTS, formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                });
                 message.success("Thêm sản phẩm thành công");
             }
 
             setOpen(false);
-            fetchProducts();
+            fetchProducts(); // Tải lại bảng
         } catch (error) {
-            // Bắt lỗi nếu API trả về lỗi hoặc người dùng chưa nhập đủ form
+            console.error(error);
             if (error.response) {
                 message.error("Lỗi: " + error.response.data.error);
+            } else {
+                message.error("Có lỗi xảy ra");
             }
         }
     };
 
     const columns = [
-        { title: "ID", dataIndex: "product_id", width: 70 },
+        { title: "ID", dataIndex: "product_id", width: 50 },
+        // Thêm cột hiển thị ảnh
+        { 
+            title: "Ảnh", 
+            dataIndex: "image_url",
+            render: (url) => (
+                <Image 
+                    width={50} 
+                    src={url ? url : "https://via.placeholder.com/50"} 
+                    alt="sp"
+                    style={{ borderRadius: '5px', objectFit: 'cover' }}
+                />
+            )
+        },
         { title: "Tên sản phẩm", dataIndex: "product_name" },
         {
             title: "Giá",
             dataIndex: "price",
             render: (v) => `${Number(v).toLocaleString()} ₫`,
         },
-        { title: "Tồn kho", dataIndex: "stock" },
+        { title: "Tồn kho", dataIndex: "stock", align: 'center' },
         {
             title: "Hành động",
             render: (_, r) => (
@@ -163,7 +212,6 @@ const Products = () => {
                         <InputNumber style={{ width: "100%" }} placeholder="Ví dụ: 10" />
                     </Form.Item>
 
-                    {/* 3. Đã đổi từ InputNumber sang Select Dropdown */}
                     <Form.Item name="category_id" label="Danh mục" rules={[{ required: true, message: 'Vui lòng chọn danh mục!' }]}>
                         <Select placeholder="-- Chọn một danh mục --">
                             {categories.map((cat) => (
@@ -174,8 +222,15 @@ const Products = () => {
                         </Select>
                     </Form.Item>
 
-                    <Form.Item name="image_url" label="Link Ảnh (URL)">
-                        <Input placeholder="https://..." />
+                    {/* Thay đổi Input text thành Input File */}
+                    <Form.Item label="Hình ảnh sản phẩm">
+                        <Input type="file" onChange={handleFileChange} accept="image/*" />
+                        {/* Nếu đang sửa, hiện ảnh cũ để người dùng nhớ */}
+                        {editing && editing.image_url && !file && (
+                            <div style={{ marginTop: 10, fontSize: 12, color: 'gray' }}>
+                                Ảnh hiện tại: <a href={editing.image_url} target="_blank" rel="noreferrer">Xem ảnh</a>
+                            </div>
+                        )}
                     </Form.Item>
                 </Form>
             </Modal>

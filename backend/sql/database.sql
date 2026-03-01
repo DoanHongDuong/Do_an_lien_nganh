@@ -1,16 +1,20 @@
-
 DROP DATABASE IF EXISTS do_an_lien_nganh;
 CREATE DATABASE do_an_lien_nganh
 CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 USE do_an_lien_nganh;
 
+-- ==========================================
 -- 2. TẠO BẢNG
+-- ==========================================
+
 CREATE TABLE users (
     user_id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(50) NOT NULL UNIQUE,
-    password VARCHAR(255) NOT NULL,
+    password VARCHAR(255) NOT NULL, 
+    full_name VARCHAR(100) DEFAULT 'Nhân viên',
     role ENUM('admin', 'staff') DEFAULT 'staff',
+    salary DECIMAL(10,2) DEFAULT 5000000,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -56,7 +60,9 @@ CREATE TABLE order_items (
     FOREIGN KEY (product_id) REFERENCES products(product_id)
 );
 
--- 3. TẠO TRIGGER (Tự động tính tiền)
+-- ==========================================
+-- 3. TẠO TRIGGER (Tự động tính tiền đơn hàng)
+-- ==========================================
 DELIMITER $$
 
 CREATE TRIGGER trg_ai_order_items AFTER INSERT ON order_items
@@ -79,10 +85,17 @@ END$$
 
 DELIMITER ;
 
+-- ==========================================
+-- 4. DỮ LIỆU MẪU (MẬT KHẨU DẠNG THUẦN - DỄ SỬ DỤNG)
+-- ==========================================
 
--- Thêm tài khoản admin mặc định (Mật khẩu đang để tạm là 123456)
-INSERT INTO users (username, password, role) VALUES ('admin', '123456', 'admin');
+-- Thêm Admin
+INSERT INTO users (username, password, full_name, role, salary) 
+VALUES ('admin', '123456', 'Quản Trị Viên', 'admin', 20000000);
 
+-- Thêm Nhân viên
+INSERT INTO users (username, password, full_name, role, salary) 
+VALUES ('nhanvien', '123456', 'Nguyễn Văn Bán Hàng', 'staff', 6000000);
 
 INSERT INTO categories (category_name) VALUES 
 ('Vợt Cầu Lông'), 
@@ -106,3 +119,10 @@ INSERT INTO orders (customer_id, order_date, total_amount) VALUES
 INSERT INTO order_items (order_id, product_id, quantity, price) VALUES 
 (1, 1, 1, 4500000), 
 (2, 2, 1, 2800000);
+INSERT INTO orders (customer_id, order_date, total_amount) VALUES (1, DATE_SUB(CURDATE(), INTERVAL 1 DAY), 2500000);
+-- Thêm đơn hàng cho 2 ngày trước
+INSERT INTO orders (customer_id, order_date, total_amount) VALUES (2, DATE_SUB(CURDATE(), INTERVAL 2 DAY), 1800000);
+-- Thêm đơn hàng cho 3 ngày trước
+INSERT INTO orders (customer_id, order_date, total_amount) VALUES (1, DATE_SUB(CURDATE(), INTERVAL 3 DAY), 4200000);
+-- Thêm đơn hàng cho 4 ngày trước
+INSERT INTO orders (customer_id, order_date, total_amount) VALUES (2, DATE_SUB(CURDATE(), INTERVAL 4 DAY), 950000);

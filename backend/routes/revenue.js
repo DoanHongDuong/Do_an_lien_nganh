@@ -1,7 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const db = require("../db"); // pool.promise()
-
+const db = require("../src/db");
 // Doanh thu theo ngày
 router.get("/", async (req, res) => {
     try {
