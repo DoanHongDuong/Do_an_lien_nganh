@@ -126,3 +126,6 @@ INSERT INTO orders (customer_id, order_date, total_amount) VALUES (2, DATE_SUB(C
 INSERT INTO orders (customer_id, order_date, total_amount) VALUES (1, DATE_SUB(CURDATE(), INTERVAL 3 DAY), 4200000);
 -- Thêm đơn hàng cho 4 ngày trước
 INSERT INTO orders (customer_id, order_date, total_amount) VALUES (2, DATE_SUB(CURDATE(), INTERVAL 4 DAY), 950000);
+ALTER TABLE products 
+ADD COLUMN cost_price DECIMAL(15,2) DEFAULT 0,
+ADD COLUMN entry_date DATE DEFAULT (CURRENT_DATE);

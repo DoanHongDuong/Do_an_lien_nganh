@@ -198,38 +198,46 @@ app.get('/api/categories', async (req, res) => {
 });
 
 app.post('/api/products', upload.single('image'), async (req, res) => {
-    const { product_name, category_id, price, stock } = req.body;
-    let image_url = "";
+    const { product_name, category_id, price, cost_price, stock, entry_date } = req.body;
+    
+    // Ép kiểu để tránh lỗi SQL
+    const numPrice = parseFloat(price) || 0;
+    const numCost = parseFloat(cost_price) || 0;
+    const numStock = parseInt(stock) || 0;
+    const dateEntry = entry_date || new Date();
+
     try {
-        if (req.file) {
-            image_url = `http://localhost:${PORT}/uploads/${req.file.filename}`;
-        } else {
-            image_url = "https://via.placeholder.com/150";
-        }
+        const image_url = req.file 
+            ? `http://localhost:${PORT}/uploads/${req.file.filename}` 
+            : "https://via.placeholder.com/150";
+
         await db.query(
-            `INSERT INTO products (product_name, category_id, price, stock, image_url) VALUES (?, ?, ?, ?, ?)`,
-            [product_name, category_id, price, stock, image_url]
+            `INSERT INTO products (product_name, category_id, price, cost_price, stock, image_url, entry_date) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [product_name, category_id, numPrice, numCost, numStock, image_url, dateEntry]
         );
         res.json({ message: 'Thêm sản phẩm thành công' });
     } catch (e) {
+        console.error("Lỗi SQL chi tiết:", e.sqlMessage); // Log lỗi cụ thể ra console để debug
         res.status(500).json({ error: e.message });
     }
 });
 
 app.put('/api/products/:id', upload.single('image'), async (req, res) => {
     const { id } = req.params;
-    const { product_name, category_id, price, stock } = req.body;
+    // Lấy thêm cost_price và entry_date từ body
+    const { product_name, category_id, price, cost_price, stock, entry_date } = req.body;
+    
     try {
         if (req.file) {
             const image_url = `http://localhost:${PORT}/uploads/${req.file.filename}`;
             await db.query(
-                `UPDATE products SET product_name=?, category_id=?, price=?, stock=?, image_url=? WHERE product_id=?`,
-                [product_name, category_id, price, stock, image_url, id]
+                `UPDATE products SET product_name=?, category_id=?, price=?, cost_price=?, stock=?, image_url=?, entry_date=? WHERE product_id=?`,
+                [product_name, category_id, price, cost_price, stock, image_url, entry_date, id]
             );
         } else {
             await db.query(
-                `UPDATE products SET product_name=?, category_id=?, price=?, stock=? WHERE product_id=?`,
-                [product_name, category_id, price, stock, id]
+                `UPDATE products SET product_name=?, category_id=?, price=?, cost_price=?, stock=?, entry_date=? WHERE product_id=?`,
+                [product_name, category_id, price, cost_price, stock, entry_date, id]
             );
         }
         res.json({ message: 'Cập nhật thành công' });
@@ -447,6 +455,21 @@ app.get('/api/orders/:id/items', async (req, res) => {
         `;
         const [rows] = await db.query(query, [id]);
         res.json(rows);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+app.get('/api/inventory/finance', async (req, res) => {
+    try {
+        const query = `
+            SELECT 
+                SUM(cost_price * stock) as total_capital,
+                SUM(price * stock) as total_expected_revenue,
+                SUM((price - cost_price) * stock) as total_expected_profit
+            FROM products
+        `;
+        const [rows] = await db.query(query);
+        res.json(rows[0]);
     } catch (e) {
         res.status(500).json({ error: e.message });
     }

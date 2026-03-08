@@ -20,11 +20,13 @@ const Home = () => {
   const [stats, setStats] = useState({ revenue: 0, orders: 0, customers: 0 });
   const [chartData, setChartData] = useState({ labels: [], datasets: [] });
   const [topProducts, setTopProducts] = useState([]); // State lưu top sản phẩm
+  const [inventoryFinance, setInventoryFinance] = useState({ total_capital: 0, total_expected_revenue: 0, total_expected_profit: 0 });
 
   useEffect(() => {
     fetchStats();
     fetchChartData();
     fetchTopProducts(); // Gọi hàm lấy top sản phẩm
+    fetchInventoryFinance();
   }, []);
 
   const fetchStats = async () => {
@@ -33,7 +35,14 @@ const Home = () => {
       setStats(res.data);
     } catch (error) { console.error("Lỗi stats:", error); }
   };
-
+  const fetchInventoryFinance = async () => {
+    try {
+        const res = await axios.get('http://localhost:5000/api/inventory/finance');
+        setInventoryFinance(res.data);
+    } catch (error) { 
+        console.error("Lỗi lấy tài chính kho:", error); 
+    }
+  };
   const fetchChartData = async () => {
     try {
       const res = await axios.get('http://localhost:5000/api/revenue');
@@ -120,7 +129,45 @@ const Home = () => {
           </Card>
         </Col>
       </Row>
-
+      {/* 1.1 Khu vực Thống kê Kho hàng (MỚI) */}
+      <Row gutter={16} style={{ marginBottom: '24px' }}>
+          <Col span={8}>
+              <Card bordered={false} style={{ background: '#f0f5ff', borderRadius: 10, borderLeft: '5px solid #1890ff' }}>
+                  <Statistic 
+                      title="Vốn Tồn Kho" 
+                      value={inventoryFinance.total_capital} 
+                      valueStyle={{ color: '#003a8c', fontWeight: 'bold' }} 
+                      prefix={<DollarCircleOutlined />} 
+                      suffix="₫" 
+                  />
+                  <div style={{ fontSize: '12px', color: '#8c8c8c' }}>Tổng tiền vốn đang nằm trong kho</div>
+              </Card>
+          </Col>
+          <Col span={8}>
+              <Card bordered={false} style={{ background: '#f9f0ff', borderRadius: 10, borderLeft: '5px solid #722ed1' }}>
+                  <Statistic 
+                      title="Dự Kiến Thu" 
+                      value={inventoryFinance.total_expected_revenue} 
+                      valueStyle={{ color: '#391085', fontWeight: 'bold' }} 
+                      prefix={<RiseOutlined />} 
+                      suffix="₫" 
+                  />
+                  <div style={{ fontSize: '12px', color: '#8c8c8c' }}>Doanh thu nếu bán hết hàng hiện tại</div>
+              </Card>
+          </Col>
+          <Col span={8}>
+              <Card bordered={false} style={{ background: '#fff1f0', borderRadius: 10, borderLeft: '5px solid #f5222d' }}>
+                  <Statistic 
+                      title="Lợi Nhuận Dự Tính" 
+                      value={inventoryFinance.total_expected_profit} 
+                      valueStyle={{ color: '#a8071a', fontWeight: 'bold' }} 
+                      prefix={<FireOutlined />} 
+                      suffix="₫" 
+                  />
+                  <div style={{ fontSize: '12px', color: '#8c8c8c' }}>Tiền lãi dự kiến sau khi trừ vốn</div>
+              </Card>
+          </Col>
+      </Row>
       {/* 2. Khu vực Biểu đồ & Top Sản phẩm */}
       <Row gutter={16}>
         {/* Cột Trái: Biểu đồ (Chiếm 14/24 phần) */}
