@@ -1,20 +1,9 @@
 import {
-    Table,
-    Typography,
-    Button,
-    Modal,
-    Form,
-    Input,
-    InputNumber,
-    Space,
-    Popconfirm,
-    message,
-    Select,
-    Image // Thêm Image để hiển thị ảnh trong bảng
+    Table, Typography, Button, Modal, Form, Input, InputNumber, Space, Popconfirm, message, Select, Image, Tag, Card, Row, Col, Statistic
 } from "antd";
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { UploadOutlined } from '@ant-design/icons'; // Import icon upload
+import { PlusOutlined, SearchOutlined, InboxOutlined, DollarOutlined } from '@ant-design/icons';
 
 const { Title } = Typography;
 const API_PRODUCTS = "http://localhost:5000/api/products";
@@ -27,148 +16,93 @@ const Products = () => {
     const [open, setOpen] = useState(false);
     const [editing, setEditing] = useState(null);
     const [form] = Form.useForm();
-    
-    // State lưu file ảnh được chọn
     const [file, setFile] = useState(null);
+    const [searchText, setSearchText] = useState("");
 
-    // Lấy danh sách sản phẩm
-    const fetchProducts = async () => {
+    const fetchData = async () => {
         setLoading(true);
         try {
-            const res = await axios.get(API_PRODUCTS);
-            setData(res.data);
+            const [resP, resC] = await Promise.all([
+                axios.get(API_PRODUCTS),
+                axios.get(API_CATEGORIES)
+            ]);
+            setData(resP.data);
+            setCategories(resC.data);
         } catch {
-            message.error("Lỗi tải sản phẩm");
+            message.error("Lỗi tải dữ liệu");
         } finally {
             setLoading(false);
         }
     };
 
-    // Lấy danh sách danh mục
-    const fetchCategories = async () => {
-        try {
-            const res = await axios.get(API_CATEGORIES);
-            setCategories(res.data);
-        } catch {
-            message.error("Lỗi tải danh mục");
-        }
-    };
+    useEffect(() => { fetchData(); }, []);
 
-    useEffect(() => {
-        fetchProducts();
-        fetchCategories();
-    }, []);
+    // Filter theo tìm kiếm
+    const filteredData = data.filter(item => 
+        item.product_name.toLowerCase().includes(searchText.toLowerCase())
+    );
 
-    // Hàm xử lý khi người dùng chọn file từ máy tính
-    const handleFileChange = (e) => {
-        if (e.target.files && e.target.files[0]) {
-            setFile(e.target.files[0]); // Lưu file vào state
-        }
-    };
-
-    const openAdd = () => {
-        setEditing(null);
-        setFile(null); // Reset file cũ
-        form.resetFields();
-        setOpen(true);
-    };
-
-    const openEdit = (record) => {
-        setEditing(record);
-        setFile(null); // Reset file cũ
-        form.setFieldsValue(record);
-        setOpen(true);
-    };
-
-    const handleDelete = async (id) => {
-        try {
-            await axios.delete(`${API_PRODUCTS}/${id}`);
-            message.success("Đã xoá");
-            fetchProducts();
-        } catch (error) {
-            message.error("Lỗi khi xoá sản phẩm");
-        }
-    };
-
-    // --- PHẦN QUAN TRỌNG NHẤT: XỬ LÝ GỬI FORM DATA ---
     const handleSubmit = async () => {
         try {
             const values = await form.validateFields();
-            
-            // 1. Tạo đối tượng FormData
             const formData = new FormData();
+            Object.keys(values).forEach(key => formData.append(key, values[key]));
+            if (file) formData.append('image', file);
 
-            // 2. Đưa các dữ liệu chữ vào FormData
-            formData.append('product_name', values.product_name);
-            formData.append('price', values.price);
-            formData.append('stock', values.stock);
-            formData.append('category_id', values.category_id);
-
-            // 3. Nếu có chọn file mới thì đưa vào, không thì thôi
-            if (file) {
-                formData.append('image', file);
-            }
-
-            // 4. Gửi request
             if (editing) {
-                // Lưu ý: Nếu backend chưa hỗ trợ PUT với FormData, bạn cần sửa backend thêm.
-                // Tạm thời code này giả định backend API PUT cũng dùng multer giống POST
-                await axios.put(`${API_PRODUCTS}/${editing.product_id}`, formData, {
-                    headers: { 'Content-Type': 'multipart/form-data' }
-                });
+                await axios.put(`${API_PRODUCTS}/${editing.product_id}`, formData);
                 message.success("Cập nhật thành công");
             } else {
-                await axios.post(API_PRODUCTS, formData, {
-                    headers: { 'Content-Type': 'multipart/form-data' }
-                });
-                message.success("Thêm sản phẩm thành công");
+                await axios.post(API_PRODUCTS, formData);
+                message.success("Thêm thành công");
             }
-
             setOpen(false);
-            fetchProducts(); // Tải lại bảng
-        } catch (error) {
-            console.error(error);
-            if (error.response) {
-                message.error("Lỗi: " + error.response.data.error);
-            } else {
-                message.error("Có lỗi xảy ra");
-            }
-        }
+            setFile(null);
+            fetchData();
+        } catch (error) { message.error("Lỗi lưu sản phẩm"); }
     };
 
     const columns = [
-        { title: "ID", dataIndex: "product_id", width: 50 },
-        // Thêm cột hiển thị ảnh
         { 
             title: "Ảnh", 
-            dataIndex: "image_url",
-            render: (url) => (
-                <Image 
-                    width={50} 
-                    src={url ? url : "https://via.placeholder.com/50"} 
-                    alt="sp"
-                    style={{ borderRadius: '5px', objectFit: 'cover' }}
-                />
-            )
+            dataIndex: "image_url", 
+            width: 80,
+            render: (url) => <Image width={60} src={url || "https://via.placeholder.com/60"} style={{ borderRadius: 8, objectFit: 'cover' }} />
         },
-        { title: "Tên sản phẩm", dataIndex: "product_name" },
-        {
-            title: "Giá",
-            dataIndex: "price",
-            render: (v) => `${Number(v).toLocaleString()} ₫`,
+        { 
+            title: "Tên sản phẩm", 
+            dataIndex: "product_name",
+            render: (text) => <strong>{text}</strong>
         },
-        { title: "Tồn kho", dataIndex: "stock", align: 'center' },
+        { 
+            title: "Danh mục", 
+            dataIndex: "category_name",
+            // Tính năng Filter ngay tại đầu cột
+            filters: categories.map(c => ({ text: c.category_name, value: c.category_name })),
+            onFilter: (value, record) => record.category_name === value,
+            render: (cat) => <Tag color="cyan">{cat}</Tag>
+        },
+        { 
+            title: "Giá bán", 
+            dataIndex: "price", 
+            align: 'right',
+            sorter: (a, b) => a.price - b.price,
+            render: (v) => <b style={{ color: '#f5222d' }}>{Number(v).toLocaleString()} ₫</b> 
+        },
+        { 
+            title: "Tồn kho", 
+            dataIndex: "stock", 
+            align: 'center',
+            sorter: (a, b) => a.stock - b.stock,
+            render: (s) => <Tag color={s < 5 ? 'volcano' : 'green'}>{s < 5 ? `Sắp hết: ${s}` : s}</Tag>
+        },
         {
             title: "Hành động",
+            align: 'center',
             render: (_, r) => (
                 <Space>
-                    <Button type="link" onClick={() => openEdit(r)}>Sửa</Button>
-                    <Popconfirm
-                        title="Xoá sản phẩm này?"
-                        onConfirm={() => handleDelete(r.product_id)}
-                        okText="Có"
-                        cancelText="Không"
-                    >
+                    <Button type="link" onClick={() => { setEditing(r); form.setFieldsValue(r); setOpen(true); }}>Sửa</Button>
+                    <Popconfirm title="Xoá sản phẩm?" onConfirm={() => axios.delete(`${API_PRODUCTS}/${r.product_id}`).then(fetchData)}>
                         <Button type="link" danger>Xoá</Button>
                     </Popconfirm>
                 </Space>
@@ -177,64 +111,73 @@ const Products = () => {
     ];
 
     return (
-        <>
-            <Title level={3}>Quản lý sản phẩm</Title>
+        <div style={{ padding: '20px' }}>
+            {/* Phần thống kê nhanh giúp trang chuyên nghiệp hơn */}
+            <Row gutter={16} style={{ marginBottom: 20 }}>
+                <Col span={8}>
+                    <Card size="small">
+                        <Statistic title="Tổng sản phẩm" value={data.length} prefix={<InboxOutlined />} />
+                    </Card>
+                </Col>
+                <Col span={8}>
+                    <Card size="small">
+                        <Statistic title="Giá trị kho" value={data.reduce((sum, item) => sum + (item.price * item.stock), 0)} prefix={<DollarOutlined />} suffix="₫" />
+                    </Card>
+                </Col>
+            </Row>
 
-            <Button type="primary" onClick={openAdd} style={{ marginBottom: 16 }}>
-                + Thêm sản phẩm
-            </Button>
+            <Card title={<Title level={4} style={{ margin: 0 }}>📦 Danh sách kho hàng</Title>}
+                extra={
+                    <Space>
+                        <Input 
+                            prefix={<SearchOutlined />} 
+                            placeholder="Tìm tên sản phẩm..." 
+                            onChange={e => setSearchText(e.target.value)}
+                            style={{ width: 250 }}
+                        />
+                        <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditing(null); form.resetFields(); setOpen(true); }}>
+                            Thêm sản phẩm
+                        </Button>
+                    </Space>
+                }>
+                <Table 
+                    rowKey="product_id" 
+                    columns={columns} 
+                    dataSource={filteredData} 
+                    loading={loading}
+                    bordered
+                    pagination={{ pageSize: 6 }}
+                />
+            </Card>
 
-            <Table
-                rowKey="product_id"
-                columns={columns}
-                dataSource={data}
-                loading={loading}
-            />
-
-            <Modal
-                title={editing ? "Sửa sản phẩm" : "Thêm sản phẩm"}
-                open={open}
-                onOk={handleSubmit}
-                onCancel={() => setOpen(false)}
-                okText="Lưu"
-                cancelText="Hủy"
-            >
+            <Modal title={editing ? "Sửa sản phẩm" : "Thêm sản phẩm"} open={open} onOk={handleSubmit} onCancel={() => setOpen(false)} width={600}>
                 <Form form={form} layout="vertical">
-                    <Form.Item name="product_name" label="Tên sản phẩm" rules={[{ required: true, message: 'Vui lòng nhập tên!' }]}>
+                    <Form.Item name="product_name" label="Tên sản phẩm" rules={[{ required: true }]}>
                         <Input placeholder="Nhập tên sản phẩm..." />
                     </Form.Item>
-
-                    <Form.Item name="price" label="Giá (VNĐ)" rules={[{ required: true, message: 'Vui lòng nhập giá!' }]}>
-                        <InputNumber style={{ width: "100%" }} placeholder="Ví dụ: 2500000" />
+                    <Row gutter={16}>
+                        <Col span={12}>
+                            <Form.Item name="category_id" label="Danh mục" rules={[{ required: true }]}>
+                                <Select placeholder="Chọn loại">
+                                    {categories.map(c => <Select.Option key={c.category_id} value={c.category_id}>{c.category_name}</Select.Option>)}
+                                </Select>
+                            </Form.Item>
+                        </Col>
+                        <Col span={12}>
+                            <Form.Item name="price" label="Giá bán" rules={[{ required: true }]}>
+                                <InputNumber style={{ width: '100%' }} formatter={v => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} suffix="₫" />
+                            </Form.Item>
+                        </Col>
+                    </Row>
+                    <Form.Item name="stock" label="Số lượng kho" rules={[{ required: true }]}>
+                        <InputNumber style={{ width: '100%' }} min={0} />
                     </Form.Item>
-
-                    <Form.Item name="stock" label="Số lượng tồn kho" rules={[{ required: true, message: 'Vui lòng nhập số lượng!' }]}>
-                        <InputNumber style={{ width: "100%" }} placeholder="Ví dụ: 10" />
-                    </Form.Item>
-
-                    <Form.Item name="category_id" label="Danh mục" rules={[{ required: true, message: 'Vui lòng chọn danh mục!' }]}>
-                        <Select placeholder="-- Chọn một danh mục --">
-                            {categories.map((cat) => (
-                                <Select.Option key={cat.category_id} value={cat.category_id}>
-                                    {cat.category_name}
-                                </Select.Option>
-                            ))}
-                        </Select>
-                    </Form.Item>
-
-                    {/* Thay đổi Input text thành Input File */}
                     <Form.Item label="Hình ảnh sản phẩm">
-                        <Input type="file" onChange={handleFileChange} accept="image/*" />
-                        {/* Nếu đang sửa, hiện ảnh cũ để người dùng nhớ */}
-                        {editing && editing.image_url && !file && (
-                            <div style={{ marginTop: 10, fontSize: 12, color: 'gray' }}>
-                                Ảnh hiện tại: <a href={editing.image_url} target="_blank" rel="noreferrer">Xem ảnh</a>
-                            </div>
-                        )}
+                        <Input type="file" onChange={e => setFile(e.target.files[0])} accept="image/*" />
                     </Form.Item>
                 </Form>
             </Modal>
-        </>
+        </div>
     );
 };
 

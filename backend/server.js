@@ -176,9 +176,18 @@ app.delete('/api/customers/:id', async (req, res) => {
 // ==========================================
 app.get('/api/products', async (req, res) => {
     try {
-        const [rows] = await db.query('SELECT * FROM products');
+        // JOIN bảng categories để lấy cột category_name
+        const query = `
+            SELECT p.*, c.category_name 
+            FROM products p
+            JOIN categories c ON p.category_id = c.category_id
+            ORDER BY p.product_id DESC
+        `;
+        const [rows] = await db.query(query);
         res.json(rows);
-    } catch (e) { res.status(500).json({ error: e.message }); }
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
 });
 
 app.get('/api/categories', async (req, res) => {
@@ -254,32 +263,69 @@ app.get('/api/orders', async (req, res) => {
 });
 
 app.post('/api/orders', async (req, res) => {
-    const { customer_id, product_id, quantity, order_date } = req.body;
+    const { customer_id, order_date, items } = req.body; 
+    // items là mảng: [{ product_id: 1, quantity: 2 }, { product_id: 5, quantity: 1 }]
+
+    if (!items || items.length === 0) {
+        return res.status(400).json({ error: "Đơn hàng phải có ít nhất một sản phẩm!" });
+    }
+
     const connection = await db.getConnection();
     try {
         await connection.beginTransaction();
-        const [rows] = await connection.query("SELECT stock, price FROM products WHERE product_id = ?", [product_id]);
-        if (rows.length === 0) throw new Error("Sản phẩm không tồn tại");
-        const product = rows[0];
-        if (quantity > product.stock) {
-            throw new Error(`Kho chỉ còn ${product.stock}, không đủ bán ${quantity}!`);
-        }
-        const total_amount = product.price * quantity;
+
+        // 1. Tạo đơn hàng tổng trước (total_amount tạm thời là 0)
         const [orderResult] = await connection.query(
-            "INSERT INTO orders (customer_id, order_date, total_amount) VALUES (?, ?, ?)",
-            [customer_id, order_date, total_amount]
+            "INSERT INTO orders (customer_id, order_date, total_amount) VALUES (?, ?, 0)",
+            [customer_id, order_date]
         );
         const newOrderId = orderResult.insertId;
+
+        let grandTotal = 0;
+
+        // 2. Lặp qua danh sách sản phẩm khách mua
+        for (const item of items) {
+            const { product_id, quantity } = item;
+
+            // Kiểm tra tồn kho và lấy giá sản phẩm
+            const [prodRows] = await connection.query(
+                "SELECT stock, price, product_name FROM products WHERE product_id = ?", 
+                [product_id]
+            );
+
+            if (prodRows.length === 0) throw new Error(`Sản phẩm ID ${product_id} không tồn tại`);
+            
+            const product = prodRows[0];
+
+            if (quantity > product.stock) {
+                throw new Error(`Sản phẩm "${product.product_name}" chỉ còn ${product.stock} trong kho!`);
+            }
+
+            const itemTotal = product.price * quantity;
+            grandTotal += itemTotal;
+
+            // 3. Chèn vào bảng order_items
+            await connection.query(
+                "INSERT INTO order_items (order_id, product_id, quantity, price) VALUES (?, ?, ?, ?)",
+                [newOrderId, product_id, quantity, product.price]
+            );
+
+            // 4. Trừ tồn kho
+            await connection.query(
+                "UPDATE products SET stock = stock - ? WHERE product_id = ?",
+                [quantity, product_id]
+            );
+        }
+
+        // 5. Cập nhật lại tổng tiền cuối cùng vào bảng orders
         await connection.query(
-            "INSERT INTO order_items (order_id, product_id, quantity, price) VALUES (?, ?, ?, ?)",
-            [newOrderId, product_id, quantity, product.price]
+            "UPDATE orders SET total_amount = ? WHERE order_id = ?",
+            [grandTotal, newOrderId]
         );
-        await connection.query(
-            "UPDATE products SET stock = stock - ? WHERE product_id = ?",
-            [quantity, product_id]
-        );
+
         await connection.commit();
         res.json({ message: "Tạo đơn hàng thành công!", order_id: newOrderId });
+
     } catch (error) {
         await connection.rollback();
         res.status(400).json({ error: error.message });
@@ -288,7 +334,49 @@ app.post('/api/orders', async (req, res) => {
     }
 });
 
+app.delete('/api/orders/:id', async (req, res) => {
+    const { id } = req.params;
+    const connection = await db.getConnection();
+    
+    try {
+        // Bắt đầu giao dịch (Transaction) để đảm bảo an toàn dữ liệu
+        await connection.beginTransaction();
 
+        // 1. Lấy danh sách sản phẩm trong đơn để biết số lượng cần hoàn lại kho
+        const [items] = await connection.query(
+            "SELECT product_id, quantity FROM order_items WHERE order_id = ?", 
+            [id]
+        );
+
+        // 2. Hoàn trả số lượng sản phẩm về lại bảng products (Cộng lại tồn kho)
+        for (const item of items) {
+            await connection.query(
+                "UPDATE products SET stock = stock + ? WHERE product_id = ?",
+                [item.quantity, item.product_id]
+            );
+        }
+
+        // 3. Xóa các chi tiết đơn hàng trước (trong bảng order_items)
+        await connection.query("DELETE FROM order_items WHERE order_id = ?", [id]);
+
+        // 4. Cuối cùng mới xóa đơn hàng chính (trong bảng orders)
+        await connection.query("DELETE FROM orders WHERE order_id = ?", [id]);
+
+        // Xác nhận hoàn tất mọi thay đổi
+        await connection.commit();
+        
+        res.json({ success: true, message: "Đã xóa đơn hàng và hoàn lại kho thành công!" });
+
+    } catch (error) {
+        // Nếu có lỗi ở bất kỳ bước nào, quay ngược lại trạng thái cũ (Rollback)
+        await connection.rollback();
+        console.error("Lỗi xóa đơn hàng:", error);
+        res.status(500).json({ error: "Lỗi hệ thống khi xóa đơn hàng" });
+    } finally {
+        // Trả lại kết nối cho hồ chứa (pool)
+        connection.release();
+    }
+});
 // ==========================================
 // API 5: DASHBOARD & KHÁC
 // ==========================================
@@ -344,7 +432,25 @@ app.get('/api/dashboard/top-products', async (req, res) => {
         res.status(500).json({ error: e.message });
     }
 });
-
+app.get('/api/orders/:id/items', async (req, res) => {
+    const { id } = req.params;
+    try {
+        const query = `
+            SELECT 
+                oi.order_item_id, 
+                p.product_name, 
+                oi.quantity, 
+                oi.price
+            FROM order_items oi
+            JOIN products p ON oi.product_id = p.product_id
+            WHERE oi.order_id = ?
+        `;
+        const [rows] = await db.query(query, [id]);
+        res.json(rows);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
 // START SERVER
 app.listen(PORT, () =>
     console.log(`🚀 Backend đang chạy tại: http://localhost:${PORT}`)
