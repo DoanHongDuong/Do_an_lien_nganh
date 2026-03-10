@@ -52,14 +52,14 @@ const Login = ({ onLogin }) => {
                         name="username"
                         rules={[{ required: true, message: 'Vui lòng nhập tên đăng nhập!' }]}
                     >
-                        <Input prefix={<UserOutlined />} placeholder="Tên đăng nhập (admin)" />
+                        <Input prefix={<UserOutlined />} placeholder="Tên đăng nhập" />
                     </Form.Item>
 
                     <Form.Item
                         name="password"
                         rules={[{ required: true, message: 'Vui lòng nhập mật khẩu!' }]}
                     >
-                        <Input.Password prefix={<LockOutlined />} placeholder="Mật khẩu (123456)" />
+                        <Input.Password prefix={<LockOutlined />} placeholder="Mật khẩu" />
                     </Form.Item>
 
                     <Form.Item>
